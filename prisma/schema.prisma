@@ -1,0 +1,221 @@
+// devvault prisma schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------
+// NextAuth.js Required Models
+// ------------------------------------
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String  @map("user_id")
+  type               String
+  provider           String
+  providerAccountId  String  @map("provider_account_id")
+  refresh_token      String? @db.Text
+  access_token       String? @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  password      String?   // For credentials provider
+  image         String?
+  role          UserRole  @default(USER)
+
+  accounts      Account[]
+  sessions      Session[]
+  
+  // DevVault Specific
+  resources     Resource[]    // Resources submitted
+  reviews       Review[]      // Reviews given
+  collections   Collection[]  // Collections created
+  saved         SavedResource[] // Resources saved
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ------------------------------------
+// DevVault Specific Models
+// ------------------------------------
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  icon        String?
+  
+  resources   Resource[]
+  
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("categories")
+}
+
+model Tag {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
+  
+  resources   ResourceTag[]
+  
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("tags")
+}
+
+model Resource {
+  id          String     @id @default(cuid())
+  title       String
+  slug        String     @unique
+  description String     @db.Text
+  url         String
+  githubUrl   String?
+  pricing     PricingTier @default(FREE)
+  imageUrl    String?
+
+  // Relations
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id])
+  
+  submitterId String
+  submitter   User       @relation(fields: [submitterId], references: [id])
+
+  tags        ResourceTag[]
+  reviews     Review[]
+  savedBy     SavedResource[]
+
+  // Stats (computed optionally)
+  rating      Float      @default(0)
+  reviewCount Int        @default(0)
+  saveCount   Int        @default(0)
+  views       Int        @default(0)
+  
+  status      PublishStatus @default(PENDING) // Manual review
+  
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("resources")
+}
+
+enum PricingTier {
+  FREE
+  FREEMIUM
+  PAID
+  OPEN_SOURCE
+}
+
+enum PublishStatus {
+  PENDING
+  PUBLISHED
+  REJECTED
+}
+
+// Many-to-many explicit table for Tags to allow extra metadata if needed
+model ResourceTag {
+  resourceId String
+  tagId      String
+  
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([resourceId, tagId])
+  @@map("resource_tags")
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  rating      Int      // 1-5
+  comment     String?  @db.Text
+  
+  resourceId  String
+  resource    Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([resourceId, userId]) // 1 review per user per resource
+  @@map("reviews")
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?  @db.Text
+  isPublic    Boolean  @default(false)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  savedCount  Int      @default(0)
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("collections")
+}
+
+model SavedResource {
+  id          String   @id @default(cuid())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  resourceId  String
+  resource    Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, resourceId])
+  @@map("saved_resources")
+}
