@@ -144,7 +144,7 @@ export default async function ResourcePage({ params }: { params: { slug: string 
               <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider mb-4">Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {resource.tags.length > 0 ? (
-                  resource.tags.map((rt) => (
+                  resource.tags.map((rt: any) => (
                     <Tag key={rt.tag.id} active={false} label={rt.tag.name} />
                   ))
                 ) : (
