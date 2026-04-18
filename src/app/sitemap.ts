@@ -28,7 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       select: { slug: true, updatedAt: true },
     });
 
-    const resourceRoutes = resources.map((resource) => ({
+    const resourceRoutes = resources.map((resource: any) => ({
       url: `${BASE_URL}/resource/${resource.slug}`,
       lastModified: resource.updatedAt,
       changeFrequency: 'monthly' as const,
